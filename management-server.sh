@@ -1,13 +1,14 @@
 #!/bin/bash
 
-#VARS
-LGS="/shadow/lgs/1"
-GMS="/shadow/gms/2"
-ZS="/shadow/zs1/3teste"
-LGSDIR="/shadow/lgs"
-GMSDIR="/shadow/gms"
-ZSDIR="/shadow/zs1"
+#VARS - ALTERAR
+LGS="/mixmaster/lgs/1"
+GMS="/mixmaster/gms/2"
+ZS="/mixmaster/zs1/3teste"
+LGSDIR="/mixmaster/lgs"
+GMSDIR="/mixmaster/gms"
+ZSDIR="/mixmaster/zs1"
 
+#SCRIPT
 function options(){
 echo "1. Start Server"
 echo "2. Stop Server"
