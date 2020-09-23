@@ -62,7 +62,7 @@ if (( $MODE == 1 )); then
 	IND=1
 	gms2="/"
 	while (( $IND <= $IND2 )); do
-		GMSDIR_2="$gms${ARRAYGMS2[$IND]}/"
+		GMSDIR_2="$gms2${ARRAYGMS2[$IND]}/"
 		gms2=$GMSDIR_2
 		let IND=($IND+1)
 	done
