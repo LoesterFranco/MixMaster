@@ -127,7 +127,7 @@ fi
 }
 function stop_zs(){
 PSZS=$(ps aux | grep zs1 | grep -v grep | wc -l)
-if (( $PSZS > 0 ))
+if (( $PSZS > 0 )); then
 	sleep 10
 	echo "$I%"
 	let I=($I+10)
