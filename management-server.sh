@@ -1,14 +1,14 @@
 #!/bin/bash
 
-#VARS - ALTERAR
-LGS="/mixmaster/lgs/1"
-GMS="/mixmaster/gms/2"
-ZS="/mixmaster/zs1/3teste"
-LGSDIR="/mixmaster/lgs"
-GMSDIR="/mixmaster/gms"
-ZSDIR="/mixmaster/zs1"
+#VARS
+SUBDIR="shadow" # Colocar diretório anterior as pastas lgs, gms e zs1: se a pasta fica no /etc/mixmaster, colocar "mixmaster"
+LGS="/$SUBDIR/lgs/1"
+GMS="/$SUBDIR/gms/2"
+ZS="/$SUBDIR/zs1/3teste"
+LGSDIR="/$SUBDIR/lgs"
+GMSDIR="/$SUBDIR/gms"
+ZSDIR="/$SUBDIR/zs1"
 
-#SCRIPT
 function options(){
 echo "1. Start Server"
 echo "2. Stop Server"
@@ -35,7 +35,7 @@ case $OPTION in
 esac
 }
 function check_start(){
-PS=$(ps aux | grep shadow | grep -v grep | wc -l)
+PS=$(ps aux | grep $SUBDIR | grep -v grep | wc -l)
 if (( $PS > 0 )); then
 	PSZS=$(ps aux | grep zs1 | grep -v grep | wc -l)
 	if (( $PSZS == 1 )); then
@@ -87,18 +87,17 @@ echo "Server ON"
 exit 0
 }
 function check_stop(){
-PS=$(ps aux | grep shadow | grep -v grep | wc -l)
+PS=$(ps aux | grep $SUBDIR | grep -v grep | wc -l)
 if (( $PS > 0 )); then
 	PSZS=$(ps aux | grep zs1 | grep -v grep | wc -l)
 	if (( $PSZS > 0 )); then
 		PIDZS=$(ps aux | pgrep -f zs1 | grep -v grep)
-		echo "Shutting down Zone Server"
 		kill $PIDZS
-		echo Wait; sleep 5; echo .; sleep 5; echo .; sleep 5; echo .; sleep 5; echo .; sleep 5; echo .; sleep 5; echo .; sleep 5; echo .;
-		echo
-		echo "Zone Server disconnected"
-		echo
-		check_stop
+		echo "Shutting down Zone Server"
+		echo "wait"
+		I=10
+		var=1
+		stop_zs
 	else
 		PSGMS=$(ps aux | grep gms | grep -v grep | wc -l)
 		if (( $PSGMS > 0 )); then
@@ -126,19 +125,35 @@ else
 	exit 0
 fi
 }
+function stop_zs(){
+PSZS=$(ps aux | grep zs1 | grep -v grep | wc -l)
+if (( $PSZS > 0 ))
+	sleep 10
+	echo "$I%"
+	let I=($I+10)
+	stop_zs
+else
+	echo "Zone Server disconnected"
+	echo
+	if (( $var == 1 )); then
+		check_stop
+	elif (( $var == 2 )); then
+		check_restart_top
+	fi		
+fi
+}
 function check_restart_stop(){
-PS=$(ps aux | grep shadow | grep -v grep | wc -l)
+PS=$(ps aux | grep $SUBDIR | grep -v grep | wc -l)
 if (( $PS > 0 )); then
 	PSZS=$(ps aux | grep zs1 | grep -v grep | wc -l)
 	if (( $PSZS > 0 )); then
 		PIDZS=$(ps aux | pgrep -f zs1 | grep -v grep)
 		echo "Shutting down Zone Server"
 		kill $PIDZS
-		echo Wait; sleep 10; echo . && sleep 10 && echo . && sleep 10 && echo . && sleep 10 && echo . && sleep 10; echo . && sleep 10 && echo . && sleep 3
-		echo
-		echo "Zone Server disconnected"
-		echo
-		check_restart_stop
+		echo wait
+		I=10
+		var=2
+		stop_sz
 	else
 		PSGMS=$(ps aux | grep gms | grep -v grep | wc -l)
 		if (( $PSGMS > 0 )); then
