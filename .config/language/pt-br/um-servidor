@@ -19,8 +19,7 @@ function options() {
 		0 0 0 \
 		1 "Iniciar Servidor" \
 		2 "Parar Servidor" \
-		3 "Reiniciar Servidor" \
-		4 "Reconfigurar servidor")
+		3 "Reiniciar Servidor" )
 	case $OPTION in
 	1)
 		echo "$date Opção selecionada: Iniciar Servidor" >>$LOGINF
