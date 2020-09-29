@@ -1,0 +1,7 @@
+LOGDIR=/tmp/MixMaster/logs
+CONFIGDIR=/tmp/MixMaster/.config
+LANGUAGEDIR=/tmp/MixMaster/.config/language
+PTBR=/tmp/MixMaster/.config/language/pt-br
+ENUS=/tmp/MixMaster/.config/language/en-us
+ARCHIVES=/tmp/MixMaster/.config/packages
+CONFIGLOG=/tmp/MixMaster/logs/activity-10.52.34.log
