@@ -1,0 +1,164 @@
+#!/bin/bash
+DIR="MUDARPATHFULL"
+LGS="MUDARLGS"
+GMS="MUDARGMS"
+ZS="MUDARZS"
+LGSDIR="MUDARPATHLGS"
+GMSDIR="MUDARPATHGMS"
+ZSDIR="MUDARPATHZS"
+LOGINF="/var/log/mixmaster/information.log"
+LOGERR="/var/log/mixmaster/error.log"
+date=$(date)
+function reconf() {
+    dialog --backtitle "MIXMASTER MANAGER" --yesno "you will configure the mixmaster server, do you want to continue?" 0 0
+    case $? in
+    0)
+        echo "$date Reconfigure: yes" >>$LOGINF
+        check
+        ;;
+    *)
+        echo "$date Reconfigure: no" >>$LOGINF
+        ;;
+    esac
+}
+function check() {
+    PS=$(ps aux | pgrep -f $DIR | grep -v grep | wc -l)
+    if (($PS > 0)); then
+        dialog --backtitle "MIXMASTER MANAGER" --yesno "The server must be shut down to continue, do you want to shut down?" 0 0
+        case $? in
+        0)
+            echo "$date Stopping server" >>$LOGINF
+            stop
+            ;;
+        *)
+            echo "$date Operation canceled" >>$LOGINF
+            reconf
+            ;;
+        esac
+    else
+        copy-files
+    fi
+}
+function stop() {
+    PSZS=$(ps aux | pgrep -f $ZS | grep -v grep | wc -l)
+    PSGMS=$(ps aux | pgrep -f $GMS | grep -v grep | wc -l)
+    PSLGS=$(ps aux | pgrep -f $LGS | grep -v grep | wc -l)
+    if (($PSZS > 0)); then
+        PIDZS=$(ps aux | pgrep -f $ZS | grep -v grep)
+        kill $PIDZS
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "Turning off ZS: 0%" 0 0
+        I=10
+        stop_zs
+    elif (($PSGMS > 0)); then
+        PIDGMS=$(ps aux | pgrep -f $GMS | grep -v grep)
+        kill $PIDGMS
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "Turning off GMS" 0 0
+        sleep 3
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS off" 0 0
+        echo "$date GMS off" >>$LOGINF
+        sleep 3
+        stop
+    elif (($PSLGS > 0)); then
+        PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+        kill $PIDLGS
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "Turning off LGS" 0 0
+        sleep 3
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS off" 0 0
+        sleep 3
+        dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Server off" 0 0
+        echo "$date LGS off" >>$LOGINF
+        echo "$date Server off" >>$LOGINF
+        options
+    else
+        echo "$date Server off" >>$LOGINF
+        dialog --backtitle "MIXMASTER MANAGER" --ok-label Reconfigure --msgbox "Server off" 0 0
+        case $? in
+        0) copy-files ;;
+        *) reconf ;;
+        esac
+
+    fi
+}
+function stop_zs() {
+    PSZS=$(ps aux | pgrep -f $ZS | grep -v grep | wc -l)
+    if (($PSZS > 0)); then
+        sleep 7
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "Turning off ZS: $I%" 0 0
+        let I=($I + 10)
+        stop_zs
+    else
+        dialog --backtitle "MIXMASTER MANAGER" --infobox "ZS off" 0 0
+        echo "$date ZS off" >>$LOGINF
+        sleep 3
+        stop
+    fi
+}
+function copy-files() {
+    rm -f $LGSDIR/lgs_db.enc $LGSDIR/key
+    rm -f $GMSDIR/gms_db.enc $GMSDIR/key
+    rm -f $ZSDIR/zs_db.enc $ZSDIR/key
+    rm -rf $DIR/data/cfg_*
+    ATUALIP=$(cat $GMSDIR/gms.cfg | grep "LS_IP" | cut -d'=' -f2)
+    ipaddr=$(ip a | grep inet | cut -d' ' -f6 | sed -n -e 3p | cut -d'/' -f1)
+    sed -i "s:$ATUALIP:$ipaddr:g" $LGDIR/lgs.cfg
+    sed -i "s:$ATUALIP:$ipaddr:g" $GMSDIR/gms.cfg
+    sed -i "s:$ATUALIP:$ipaddr:g" $ZSDIR/zs.cfg
+    sed -i "s:$ATUALIP:$ipaddr:g" $LGSDIR/ftplist.cfg
+    nomeserver=$(dialog \
+        --stdout \
+        --backtitle "MIXMASTER MANAGER" \
+        --ok-label Next \
+        --inputbox "Server Name:" 0 0)
+    case $? in
+    1 | 255) copy-files ;;
+    esac
+    nomeatual=$(cat $GMSDIR/gms.cfg | grep ^NAME | cut -d'=' -f2)
+    sed -i "s:$nomeatual:$nomeserver:g" $GMSDIR/gms.cfg
+    config_banco
+}
+function config_banco() {
+    loginatual=$(cat $DIR/data/lgs.cfg | grep "logindb_ID" | cut -d'=' -f2)
+    senhaatual=$(cat $DIR/data/lgs.cfg | grep "logindb_PW" | cut -d'=' -f2)
+    username=$(dialog \
+        --stdout \
+        --backtitle "MIXMASTER MANAGER" \
+        --ok-label Next \
+        --title 'Database Configuration' \
+        --inputbox "User:" 0 0)
+    case $? in
+    1 | 255) copy-files ;;
+    esac
+    password=$(dialog \
+        --stdout \
+        --backtitle "MIXMASTER MANAGER" \
+        --ok-label Next \
+        --title 'Database Configuration' \
+        --passwordbox "Password:" 0 0)
+    case $? in
+    1 | 255) config_banco ;;
+    esac
+
+    sed -i "s:$loginatual:$username:g" $DIR/data/lgs.cfg
+    sed -i "s:$senhaatual:$password:g" $DIR/data/lgs.cfg
+    sed -i "s:$loginatual:$username:g" $DIR/data/gms.cfg
+    sed -i "s:$senhaatual:$password:g" $DIR/data/gms.cfg
+    sed -i "s:$loginatual:$username:g" $DIR/data/zs.cfg
+    sed -i "s:$senhaatual:$password:g" $DIR/data/zs.cfg
+    configuration_server
+}
+function configuration_server() {
+    cd $DIR
+    (
+        echo 1
+        echo 1
+    ) | $DIR/cypher
+    cypherdata=$(find $DIR/data/ -type d -name cfg_*)
+    encodelgs="$cypherdata/encode/lgs_db.enc"
+    encodegms="$cypherdata/encode/gms_db.enc"
+    encodezs="$cypherdata/encode/zs_db.enc"
+    encodekey="$cypherdata/key"
+    cp $encodelgs $encodekey $LGSDIR/
+    cp $encodegms $encodekey $GMSDIR/
+    cp $encodezs $encodekey $ZSDIR/
+}
+reconf

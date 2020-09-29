@@ -1,0 +1,74 @@
+#!/bin/bash
+#VARS
+DIR=$(pwd)
+CONFIGDIR="$DIR/.config"
+LOGDIR="$DIR/logs"
+LANGUAGEDIR="$CONFIGDIR/language"
+PTBR="$LANGUAGEDIR/pt-br"
+ENUS="$LANGUAGEDIR/en-us"
+ARCHIVES="$CONFIGDIR/packages"
+data=$(date | cut -d' ' -f4 | tr ': ' '.')
+date=$(date)
+INSTALLOG="$LOGDIR/install-$data.log"
+CONFIGLOG="$LOGDIR/activity-$data.log"
+>$CONFIGDIR/vars
+>$INSTALLOG
+>$CONFIGLOG
+echo "LOGDIR=$LOGDIR" >>$CONFIGDIR/vars
+echo "CONFIGDIR=$CONFIGDIR" >>$CONFIGDIR/vars
+echo "LANGUAGEDIR=$LANGUAGEDIR" >>$CONFIGDIR/vars
+echo "PTBR=$PTBR" >>$CONFIGDIR/vars
+echo "ENUS=$ENUS" >>$CONFIGDIR/vars
+echo "ARCHIVES=$ARCHIVES" >>$CONFIGDIR/vars
+echo "CONFIGLOG=$CONFIGLOG" >>$CONFIGDIR/vars
+RHEL1=$(uname -a | grep el6 | wc -l)
+RHEL2=$(uname -a | grep el7 | wc -l)
+if (($RHEL1 > 0)); then
+	dialog="$ARCHIVES/dialog-1.1-10.20080819.el6.x86_64.rpm"
+elif (($RHEL2 > 0)); then
+	dialog="$ARCHIVES/dialog-1.2-5.20130523.el7.x86_64.rpm"
+fi
+function check_so() {
+	SO=$(cat /etc/*-release | grep CentOS | wc -l)
+	if (($SO > 0)); then
+		echo "$date Operation System: OK" >>$INSTALLOG
+		echo "Operation System: OK"
+		echo
+		updated
+	else
+		echo
+		echo "$date Sorry, your operation system is not suported" >>$INSTALLOG
+		echo "Sorry, your operation system is not suported"
+	fi
+}
+function updated() {
+	echo
+	echo "Updating repositories"
+	yum update
+	if (($? == 0)); then
+		echo
+		echo "$date Update: OK" >>$INSTALLOG
+		echo "Update: OK"
+		echo
+		echo "Check dialog"
+		checkdialog=$(rpm -qa | grep ^dialog | wc -l)
+		if (( $checkdialog > 0 )); then
+			cd $CONFIGDIR
+			bash $CONFIGDIR/config
+		else
+			echo "Dialog not found"
+			echo "$date Dialog not found" >>$INSTALLOG
+			echo "Installing . . ."
+			rpm -i $dialog
+			cd $CONFIGDIR
+			bash $CONFIGDIR/config
+		fi
+
+	else
+		echo "$date failed to update repositories, please check your internet connection" >>$INSTALLOG
+		echo "failed to update repositories, please check your internet connection"
+	fi
+}
+clear
+echo "Check system"
+check_so

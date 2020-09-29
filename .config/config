@@ -1,0 +1,25 @@
+#!/bin/bash
+. vars
+date=$(date)
+function select_lang() {
+        question=$(dialog \
+                --stdout \
+                --backtitle "MIXMASTER MANAGER INSTALL" \
+                --ok-label Next \
+                --menu "Language" \
+                0 0 0 \
+                1 "PT BR (Portugues)" \
+                2 "EN US (English)")
+        case $question in
+        1)
+                dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Continuar --msgbox "Seja bem vindo!" 0 0
+                bash $PTBR/config
+                ;;
+        2)
+                dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "Welcome!" 0 0
+                bash $ENUS/config
+                ;;
+        *) exit ;;
+        esac
+}
+select_lang

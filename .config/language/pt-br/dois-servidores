@@ -1,0 +1,788 @@
+#!/bin/bash
+DIR="MUDARPATHFULL"
+LGS="MUDARLGS"
+GMS1="MUDARGMS1"
+ZS1="MUDARZS1"
+LGSDIR="MUDARLGSDIR"
+GMSDIR1="MUDARPATHGMS1"
+ZSDIR1="MUDARPATHZS1"
+GMS2="MUDARGMS2"
+ZS2="MUDARZS2"
+GMSDIR2="MUDARPATHGMS2"
+ZSDIR2="MUDARPATHZS2"
+LOGINF="/var/log/mixmaster/information.log"
+LOGERR="/var/log/mixmaster/error.log"
+date=$(date)
+#############################################################################################################
+function options() {
+	MENU=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER" \
+		--ok-label Continuar \
+		--menu "O que deseja fazer?" \
+		0 0 0 \
+		1 "Iniciar Servidor" \
+		2 "Parar Servidor" \
+		3 "Reiniciar Servidor")
+	case $MENU in
+	1)
+		echo "$date Opção selecionada: Iniciar Servidor" >>$LOGINF
+		options2
+		;;
+	2)
+		echo "$date Opção selecionada: Parar Servidor" >>$LOGINF
+		options2
+		;;
+	3)
+		echo "$date Opção selecionada: Reiniciar Servidor" >>$LOGINF
+		options2
+		;;
+	*)
+		echo "$date Programa fechado" >>$LOGINF
+		;;
+	esac
+}
+function options2() {
+	SELECT_TYPE=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER" \
+		--ok-label Continuar \
+		--menu "Executar para:" \
+		0 0 0 \
+		1 "somente 1 servidor" \
+		2 "os 2 servidores")
+	case $SELECT_TYPE in
+	1)
+		echo "$date Valor da ação: 1" >>$LOGINF
+		options_select
+		;;
+	2)
+		echo "$date Valor da ação: 2" >>$LOGINF
+		confirm
+		;;
+	*)
+		echo "$date Janela rejeitada, voltando ao menu" >>$LOGINF
+		options
+		;;
+	esac
+
+}
+function options_select() {
+	OPTION=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER" \
+		--ok-label Continuar \
+		--menu "Selecione o servidor" \
+		0 0 0 \
+		1 "Servidor 1" \
+		2 "Servidor 2")
+	case $OPTION in
+	1)
+		server_select=1
+		echo "$date Servidor 1 selecionado" >>$LOGINF
+		confirm
+		;;
+	2)
+		server_select=2
+		echo "$date Servidor 2 selecionado" >>$LOGINF
+		confirm
+		;;
+	*)
+		options2
+		;;
+	esac
+}
+function confirm() {
+	dialog --backtitle "MIXMASTER MANAGER" --yes-label Sim --no-label Não --yesno "Confirmar ação?" 0 0
+	case $? in
+	0)
+		echo "$date Ação confirmada" >>$LOGINF
+		check
+		;;
+	*)
+		echo "$date Ação rejeitada" >>$LOGINF
+		options
+		;;
+	esac
+}
+function check() {
+	case $MENU in
+	1) start ;;
+	2) pre_check_stop ;;
+	3) pre_check_restart ;;
+	esac
+}
+function pre_check_stop() {
+	dialog --backtitle "MIXMASTER MANAGER" --yes-label Sim --no-label Não --yesno "Deseja parar o LGS (Login Server)?" 0 0
+	case $? in
+	0)
+		yesorno=1
+		echo "$date Para LGS: Sim" >>$LOGINF
+		stop
+		;;
+	1)
+		yesorno=0
+		echo "$date Para LGS: Não" >>$LOGINF
+		stop
+		;;
+	*)
+		echo "$date Janela rejeitada, voltando ao menu" >>$LOGINF
+		options
+		;;
+	esac
+}
+function pre_check_restart() {
+	dialog --backtitle "MIXMASTER MANAGER" --yes-label Sim --no-label Não --yesno "Deseja reiniciar o LGS (Login Server)?" 0 0
+	case $? in
+	0)
+		yesorno=1
+		echo "$date Reiniciar LGS: Sim" >>$LOGINF
+		restart_stop
+		;;
+	1)
+		yesorno=0
+		echo "$date Reiniciar LGS: Não" >>$LOGINF
+		restart_stop
+		;;
+	*)
+		echo "$date Janela rejeitada, voltando ao menu" >>$LOGINF
+		options
+		;;
+	esac
+}
+function start() {
+	if (($SELECT_TYPE == 1)); then
+		if (($server_select == 1)); then
+			PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+			PSGMS=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+			PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+			if (($PSZS > 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "ZS já está ligado" 0 0
+				echo "$date Servidor não iniciado: ZS já está ligado" >>$LOGINF
+				options
+			elif (($PSGMS > 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "GMS já está ligado" 0 0
+				echo "$date Servidor não iniciado: GMS já está ligado" >>$LOGINF
+				options
+			elif (($PSLGS > 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "LGS já está ligado" 0 0
+				echo "$date Servidor não iniciado: LGS já está ligado" >>$LOGINF
+				var=1
+				started
+			else
+				started
+			fi
+		elif (($server_select == 2)); then
+			PSZS=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+			PSGMS=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+			PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+			if (($PSZS > 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "ZS, GMS e LGS já está ligado" 0 0
+				echo "$date Servidor não iniciado: ZS, GMS e LGS já está ligado" >>$LOGINF
+				options
+			elif (($PSGMS > 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "GMS e LGS já está ligado" 0 0
+				echo "$date Servidor não iniciado: GMS e LGS já está ligado" >>$LOGINF
+				options
+			elif (($PSLGS > 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "LGS já está ligado" 0 0
+				echo "$date Servidor não iniciado: LGS já está ligado" >>$LOGINF
+				var=1
+				started
+			else
+				started
+			fi
+		fi
+	else
+		PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+		PSZS2=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+		PSGMS=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+		PSGMS2=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+		PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+		if (($PSZS > 0)); then
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "ZS já está ligado" 0 0
+			echo "$date Servidor 1 não iniciado: ZS já está ligado" >>$LOGINF
+			options
+		elif (($PSZS2 > 0)); then
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "ZS2 já está ligado" 0 0
+			echo "$date Servidor 2 não iniciado: ZS2 já está ligado" >>$LOGINF
+			options
+		elif (($PSGMS > 0)); then
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "GMS já está ligado" 0 0
+			echo "$date Servidor não iniciado: GMS já está ligado" >>$LOGINF
+			options
+		elif (($PSGMS2 > 0)); then
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "GMS2 já está ligado" 0 0
+			echo "$date Servidor não iniciado: GMS2 já está ligado" >>$LOGINF
+			options
+		elif (($PSLGS > 0)); then
+			started
+		else
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "LGS já está ligado" 0 0
+			echo "$date Servidor não iniciado: LGS já está ligado" >>$LOGINF
+			var=1
+			started
+		fi
+	fi
+}
+function started() {
+	if (($SELECT_TYPE == 1)); then
+		if (($server_select == 1)); then
+			if (($var == 1)); then
+				cd $LGSDIR
+				$LGS &
+				echo "$date LGS iniciada" >>$LOGINF
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando LGS" 0 0
+				sleep 3
+			fi
+
+			cd $GMSDIR1
+			$GMS1 &
+			echo "$date GMS iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando GMS" 0 0
+			sleep 3
+
+			cd $ZSDIR1
+			$ZS1 &
+			echo "$date ZS iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando ZS" 0 0
+			sleep 3
+
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor iniciado" 0
+			echo "$date Servidor iniciada" >>$LOGINF
+		else
+			if (($var == 1)); then
+				cd $LGSDIR
+				$LGS &
+				echo "$date LGS iniciada" >>$LOGINF
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando LGS" 0 0
+				sleep 3
+			fi
+			cd $GMSDIR2
+			$GMS2 &
+			echo "$date GMS2 iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando GMS2" 0 0
+			sleep 3
+
+			cd $ZSDIR2
+			$ZS2 &
+			echo "$date ZS2 iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando ZS2" 0 0
+			sleep 3
+
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor iniciado" 0
+			echo "$date Servidor iniciada" >>$LOGINF
+		fi
+	else
+		if (($var == 1)); then
+			cd $LGSDIR
+			$LGS &
+			echo "$date LGS iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando LGS" 0 0
+			sleep 3
+		fi
+		cd $GMSDIR1
+		$GMS1 &
+		echo "$date GMS iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando GMS" 0 0
+		sleep 3
+
+		cd $GMSDIR2
+		$GMS2 &
+		echo "$date GMS2 iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando GMS2" 0 0
+		sleep 3
+
+		cd $ZSDIR1
+		$ZS1 &
+		echo "$date ZS iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando ZS" 0 0
+		sleep 3
+
+		cd $ZSDIR2
+		$ZS2 &
+		echo "$date ZS2 iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciando ZS2" 0 0
+		sleep 3
+
+		dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor iniciado" 0
+		echo "$date Servidor iniciada" >>$LOGINF
+	fi
+
+}
+
+function stop() {
+	if (($SELECT_TYPE == 1)); then
+		if (($server_select == 1)); then
+			PS_1=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+			PS_2=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+			if [ -z $check ]; then
+				if (($PS_1 == 0 && $PS_2 == 0)); then
+					dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor já está desligado" 0 0
+					echo "$date Ação não executada (Parar servidor): Servidor já desligado" >>$LOGINF
+					options
+				fi
+			fi
+			check=1
+			PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+			PSGMS=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+			PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+			if (($PSZS > 0)); then
+				PIDZS=$(ps aux | pgrep -f $ZS1 | grep -v grep)
+				kill $PIDZS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+				I=10
+				var=1
+				state=1
+				stop_zs
+			elif (($PSGMS > 0)); then
+				PIDGMS=$(ps aux | pgrep -f $GMS1 | grep -v grep)
+				kill $PIDGMS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+				echo "$date GMS Desligada" >>$LOGINF
+				sleep 3
+				stop
+			elif (($yesorno == 1)); then
+				if (($PSLGS > 0)); then
+					PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+					kill $PIDLGS
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando LGS" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS Desligada" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+					echo "$date LGS Desligada" >>$LOGINF
+					echo "$date Servidor Desligado" >>$LOGINF
+					options
+				else
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+				echo "$date Servidor Desligado" >>$LOGINF
+				options
+				fi
+			else
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+			echo "$date Servidor Desligado" >>$LOGINF
+			options
+			fi
+		elif (($server_select == 2)); then
+			PS_1=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+			PS_2=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+			if [ -z $check ]; then
+				if (($PS_1 == 0 && $PS_2 == 0)); then
+					dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor já está desligado" 0 0
+					echo "$date Ação não executada (Parar servidor): Servidor já desligado" >>$LOGINF
+					options
+				fi
+			fi
+			check=1
+			PSZS=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+			PSGMS=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+			PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+			if (($PSZS > 0)); then
+				PIDZS=$(ps aux | pgrep -f $ZS2 | grep -v grep)
+				kill $PIDZS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+				I=10
+				var=1
+				state=2
+				stop_zs_2
+			elif (($PSGMS > 0)); then
+				PIDGMS=$(ps aux | pgrep -f $GMS2 | grep -v grep)
+				kill $PIDGMS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+				echo "$date GMS Desligada" >>$LOGINF
+				sleep 3
+				stop
+			elif (($PSLGS > 0)); then
+				if (($yesorno == 1)); then 
+					PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+					kill $PIDLGS
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando LGS" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS Desligada" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+					echo "$date LGS Desligada" >>$LOGINF
+					echo "$date Servidor Desligado" >>$LOGINF
+					options
+				else
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+				echo "$date Servidor Desligado" >>$LOGINF
+				options
+				fi
+			else
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+			echo "$date Servidor Desligado" >>$LOGINF
+			options
+			fi
+		fi
+	else
+		PS=$(ps aux | grep $DIR | grep -v grep | wc -l)
+		if [ -z $check ]; then
+			if (($PS == 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor já está desligado" 0 0
+				echo "$date Ação não executada (Parar servidor): Servidor já desligado" >>$LOGINF
+				options
+			fi
+		fi
+		check=1
+		PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+		PSGMS=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+		PSZS2=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+		PSGMS2=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+		PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+		if (($PSZS > 0)); then
+			PIDZS=$(ps aux | pgrep -f $ZS1 | grep -v grep)
+			kill $PIDZS
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+			I=10
+			var=1
+			state=1
+			stop_zs_2
+		elif (($PSZS2 > 0)); then
+			PIDZS2=$(ps aux | pgrep -f $ZS2 | grep -v grep)
+			kill $PIDZS2
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+			I=10
+			var=1
+			state=2
+			stop_zs_2
+		elif (($PSGMS > 0)); then
+			PIDGMS=$(ps aux | pgrep -f $GMS1 | grep -v grep)
+			kill $PIDGMS
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+			sleep 3
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+			echo "$date GMS Desligada" >>$LOGINF
+			sleep 3
+			stop
+		elif (($PSGMS2 > 0)); then
+			PIDGMS2=$(ps aux | pgrep -f $GMS2 | grep -v grep)
+			kill $PIDGMS2
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS2" 0 0
+			sleep 3
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS2 Desligada" 0 0
+			echo "$date GMS Desligada" >>$LOGINF
+			sleep 3
+			stop
+		elif (($PSLGS > 0)); then
+			if (($yesorno == 1)); then
+				PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+				kill $PIDLGS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando LGS" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS Desligada" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+				echo "$date LGS Desligada" >>$LOGINF
+				echo "$date Servidor Desligado" >>$LOGINF
+				options
+			else
+				dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+				echo "$date Servidor Desligado" >>$LOGINF
+				options
+			fi
+		else
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor desligado" 0 0
+			echo "$date Servidor Desligado" >>$LOGINF
+			options
+		fi
+
+	fi
+}
+function stop_zs() {
+	if (($state == 1)); then
+		PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+	elif (($state == 2)); then
+		PSZS=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+	fi
+	if (($PSZS > 0)); then
+		sleep 7
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: $I%" 0 0
+		let I=($I + 10)
+		stop_zs
+	else
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "ZS Desligada" 0 0
+		echo "$date ZS desligada" >>$LOGINF
+		sleep 3
+		if (($var == 1)); then
+			stop
+		elif (($var == 2)); then
+			restart_stop
+		fi
+	fi
+}
+function restart_stop() {
+	if (($SELECT_TYPE == 1)); then
+		if (($server_select == 1)); then
+			PS_1=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+			PS_2=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+			if [ -z $check ]; then
+				if (($PS_1 == 0 && $PS_2 == 0)); then
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Servidor já está desligado, iniciando, aguarde..." 0 0
+					restart_start
+				fi
+			fi
+			check=1
+			PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+			PSGMS=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+			PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+			if (($PSZS > 0)); then
+				PIDZS=$(ps aux | pgrep -f $ZS1 | grep -v grep)
+				kill $PIDZS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+				I=10
+				var=2
+				state=1
+				stop_zs
+			elif (($PSGMS > 0)); then
+				PIDGMS=$(ps aux | pgrep -f $GMS1 | grep -v grep)
+				kill $PIDGMS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+				echo "$date GMS Desligado" >>$LOGINF
+				sleep 3
+				restart_stop
+			elif (($PSLGS > 0)); then
+				if (($yesorno == 1)); then
+					PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+					kill $PIDLGS
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando LGS" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS Desligada" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+					echo "$date LGS Desligada" >>$LOGINF
+					sleep 3
+					onlgs=1
+					restart_start
+				else
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+					sleep 3
+					onlgs=0
+					restart_start
+				fi
+			else
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+				onlgs=1
+				restart_start
+			fi
+		elif (($server_select == 2)); then
+			PS_1=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+			PS_2=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+			if [ -z $check ]; then
+				if (($PS_1 == 0 && $PS_2 == 0)); then
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Servidor já está desligado, iniciando, aguarde..." 0 0
+					restart_start
+				fi
+			fi
+			check=1
+			PSZS=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+			PSGMS=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+			PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+			if (($PSZS > 0)); then
+				PIDZS=$(ps aux | pgrep -f $ZS2 | grep -v grep)
+				kill $PIDZS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+				I=10
+				var=1
+				state=2
+				stop_zs
+			elif (($PSGMS > 0)); then
+				PIDGMS=$(ps aux | pgrep -f $GMS2 | grep -v grep)
+				kill $PIDGMS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+				echo "$date GMS Desligado" >>$LOGINF
+				sleep 3
+				restart_stop
+			elif (($PSLGS > 0)); then
+				if (($yesorno == 1)); then
+					PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+					kill $PIDLGS
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando LGS" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS Desligada" 0 0
+					sleep 3
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+					echo "$date LGS Desligada" >>$LOGINF
+					sleep 3
+					onlgs=1
+					restart_start
+				else
+					dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+					sleep 3
+					onlgs=0
+					restart_start
+				fi
+			else
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+				onlgs=1
+				restart_start
+			fi
+		fi
+	else
+		PSZS=$(ps aux | grep $ZS1 | grep -v grep | wc -l)
+		PSGMS=$(ps aux | grep $GMS1 | grep -v grep | wc -l)
+		PSZS2=$(ps aux | grep $ZS2 | grep -v grep | wc -l)
+		PSGMS2=$(ps aux | grep $GMS2 | grep -v grep | wc -l)
+		PSLGS=$(ps aux | grep $LGS | grep -v grep | wc -l)
+		if [ -z $check ]; then
+			if (($PSZS == 0 && $PSGMS == 0 && $PSZS2 == 0 && $PSGMS2 == 0 && $PSLGS == 0)); then
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Servidor já está desligado, iniciando, aguarde..." 0 0
+				restart_start
+			fi
+		fi
+		check=1
+		if (($PSZS > 0)); then
+			PIDZS=$(ps aux | pgrep -f $ZS1 | grep -v grep)
+			kill $PIDZS
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+			I=10
+			var=1
+			state=1
+			stop_zs
+		elif (($PSZS2 > 0)); then
+			PIDZS2=$(ps aux | pgrep -f $ZS2 | grep -v grep)
+			kill $PIDZS2
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando ZS: 0%" 0 0
+			I=10
+			var=1
+			state=2
+			stop_zs_2
+		elif (($PSGMS > 0)); then
+			PIDGMS=$(ps aux | pgrep -f $GMS1 | grep -v grep)
+			kill $PIDGMS
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+			sleep 3
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+			echo "$date GMS Desligado" >>$LOGINF
+			sleep 3
+			restart_stop
+		elif (($PSGMS2 > 0)); then
+			PIDGMS2=$(ps aux | pgrep -f $GMS2 | grep -v grep)
+			kill $PIDGMS2
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando GMS" 0 0
+			sleep 3
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "GMS Desligada" 0 0
+			echo "$date GMS Desligado" >>$LOGINF
+			sleep 3
+			restart_stop
+		elif (($PSLGS > 0)); then
+			if (($yesorno == 1)); then
+				PIDLGS=$(ps aux | pgrep -f $LGS | grep -v grep)
+				kill $PIDLGS
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Desligando LGS" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "LGS Desligada" 0 0
+				sleep 3
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+				echo "$date LGS Desligada" >>$LOGINF
+				sleep 3
+				onlgs=1
+				restart_start
+			else
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+				sleep 3
+				onlgs=0
+				restart_start
+			fi
+		else
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Ligando o servidor, aguarde..." 0 0
+			onlgs=1
+			restart_start
+		fi
+
+	fi
+}
+function restart_start() {
+	if (($var_select == 1)); then
+		if (($server_select == 1)); then
+			if (($onlgs == 1)); then
+				cd $LGSDIR
+				$LGS &
+				echo "$date LGS Iniciada" >>$LOGINF
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado LGS" 0 0
+				sleep 3
+			fi
+			cd $GMSDIR1
+			$GMS1 &
+			echo "$date GMS Iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado GMS" 0 0
+			sleep 3
+
+			cd $ZSDIR1
+			$ZS1 &
+			echo "$date ZS Iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado ZS" 0 0
+			sleep 3
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor Reiniciado" 0 0
+			echo "$date Servidor Reiniciado" >>$LOGINF
+		else
+			if (($onlgs == 1)); then
+				cd $LGSDIR
+				$LGS &
+				echo "$date LGS Iniciada" >>$LOGINF
+				dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado LGS" 0 0
+				sleep 3
+			fi
+			cd $GMSDIR2
+			$GMS2 &
+			echo "$date GMS Iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado GMS" 0 0
+			sleep 3
+
+			cd $ZSDIR_2
+			$ZS2 &
+			echo "$date ZS Iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado ZS" 0 0
+			sleep 3
+
+			dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor Reiniciado" 0 0
+			echo "$date Servidor Reiniciado" >>$LOGINF
+		fi
+	else
+		if (($onlgs == 1)); then
+			cd $LGSDIR
+			$LGS &
+			echo "$date LGS Iniciada" >>$LOGINF
+			dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado LGS" 0 0
+			sleep 3
+		fi
+		cd $GMSDIR
+		$GMS1 &
+		echo "$date GMS Iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado GMS" 0 0
+		sleep 3
+
+		cd $GMSDIR_2
+		$GMS2 &
+		echo "$date GMS2 Iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado GMS2" 0 0
+		sleep 3
+
+		cd $ZSDIR
+		$ZS1 &
+		echo "$date ZS Iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado ZS" 0 0
+		sleep 3
+
+		cd $ZSDIR_2
+		$ZS2 &
+		echo "$date ZS2 Iniciada" >>$LOGINF
+		dialog --backtitle "MIXMASTER MANAGER" --infobox "Iniciado ZS2" 0 0
+		sleep 3
+		dialog --backtitle "MIXMASTER MANAGER" --ok-label Voltar --msgbox "Servidor Reiniciado" 0 0
+		echo "$date Servidor Reiniciado" >>$LOGINF
+	fi
+}
+#Create by: Gabriel Costa
+#Date: 22/09
+#Email: g.silvafdc@gmail.com
+options

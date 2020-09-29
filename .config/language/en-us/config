@@ -1,0 +1,710 @@
+#!/bin/bash
+. vars
+date=$(date)
+function select_lang() {
+	question=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--menu "How many servers do you have?" \
+		0 0 0 \
+		1 "I have 1" \
+		2 "I have 2")
+	case $question in
+	1)
+		echo "$date Number of servers: 1" >>$CONFIGLOG
+		options
+		;;
+	2)
+		echo "$date Number of servers: 2" >>$CONFIGLOG
+		findfiles2
+		;;
+	*)
+		bash $CONFIGDIR/config
+		;;
+	esac
+}
+function options() {
+	banco=$(rpm -qa | grep ^mysql | grep server | wc -l)
+	if (($banco > 0)); then
+		dialog --backtitle "MIXMASTER MANAGER" --yesno "Do you have the server files?" 0 0
+		case $? in
+		0)
+			echo "$date Have files" >>$LOGINF
+			findfiles
+			;;
+		*)
+			echo "$date no Have files" >>$LOGINF
+			copy-files
+			;;
+		esac
+	else
+		dialog --backtitle "MIXMASTER MANAGER" --ok-label Next --msgbox "MySQL Server not installed, install Mysql Server and come back to install MixMaster Manager" 0 0
+	fi
+}
+function copy-files() {
+	dir=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "Choose the installation destination:" \
+		--fselect /mixmaster \
+		10 70)
+	case $? in
+	1 | 255) options ;;
+	esac
+	echo "$date PATH FULL: $dir" >>$CONFIGLOG
+	mkdir -p $dir
+	PATHLGS="$dir/lgs"
+	PATHGMS="$dir/gms"
+	PATHZS="$dir/zs1"
+	LGSFILE="$dir/lgs/1"
+	GMSFILE="$dir/gms/2"
+	ZSFILE="$dir/zs1/3"
+	cp $CONFIGDIR/files/* $dir/ -R
+	ipaddr=$(ip a | grep inet | cut -d' ' -f6 | sed -n -e 3p | cut -d'/' -f1)
+	sed -i "s:IPADDRESS:$ipaddr:g" $PATHLGS/lgs.cfg
+	sed -i "s:IPADDRESS:$ipaddr:g" $PATHGMS/gms.cfg
+	sed -i "s:IPADDRESS:$ipaddr:g" $PATHZS/zs.cfg
+	sed -i "s:IPADDRESS:$ipaddr:g" $PATHLGS/ftplist.cfg
+	nomeserver=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--inputbox "Server Name:" 0 0)
+	case $? in
+	1 | 255) copy-files ;;
+	esac
+	sed -i "s:NOMEDOSERVIDOR:$nomeserver:g" $PATHGMS/gms.cfg
+	config_banco
+}
+function config_banco() {
+	username=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--title 'Data Base Configuration' \
+		--inputbox "User:" 0 0)
+	case $? in
+	1 | 255) copy-files ;;
+	esac
+
+	password=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--title 'Data Base Configuration' \
+		--passwordbox "Password:" 0 0)
+	case $? in
+	1 | 255) config_banco ;;
+	esac
+
+	sed -i "s:USUARIO:$username:g" $dir/data/lgs.cfg
+	sed -i "s:SENHA:$password:g" $dir/data/lgs.cfg
+	sed -i "s:USUARIO:$username:g" $dir/data/gms.cfg
+	sed -i "s:SENHA:$password:g" $dir/data/gms.cfg
+	sed -i "s:USUARIO:$username:g" $dir/data/zs.cfg
+	sed -i "s:SENHA:$password:g" $dir/data/zs.cfg
+	configuration_server
+}
+function configuration_server() {
+	cd $dir
+	(
+		echo 1
+		echo 1
+	) | $dir/cypher
+	cypherdata=$(find $dir/data/ -type d -name cfg_*)
+	encodelgs="$cypherdata/encode/lgs_db.enc"
+	encodegms="$cypherdata/encode/gms_db.enc"
+	encodezs="$cypherdata/encode/zs_db.enc"
+	encodekey="$cypherdata/key"
+	cp $encodelgs $encodekey $PATHLGS/
+	cp $encodegms $encodekey $PATHGMS/
+	cp $encodezs $encodekey $PATHZS/
+	select_dir-copy
+}
+function findfiles() {
+	find / -type d -name lgs* 2>/dev/null 1>$LOGDIR/find.log | dialog --backtitle "MIXMASTER MANAGER" --infobox "Finding files, please wait ..." 0 0
+	finder=$(cat $LOGDIR/find.log | wc -l)
+	finderdir=$(cat $LOGDIR/find.log)
+	PATHLGS=$(cat $LOGDIR/find.log)
+	if (($finder == 1)); then
+		IFS='/' read -r -a ARRAYLGS <<<"$finderdir"
+		IND1=${#ARRAYLGS[@]}
+		let IND2=($IND1 - 2)
+		IND=1
+		lgs="/"
+		while (($IND <= $IND2)); do
+			dir="$lgs${ARRAYLGS[$IND]}/"
+			lgs=$dir
+			let IND=($IND + 1)
+		done
+		select-dir-file_lgs
+	else
+		dialog --backtitle "MIXMASTER MANAGER" --ok-label Next --msgbox "LGS not found, please show us the directory" 0 0
+		select-dir
+	fi
+}
+function findfiles2() {
+	find / -type d -name lgs* 2>/dev/null 1>$LOGDIR/find.log | dialog --backtitle "MIXMASTER MANAGER" --infobox "Finding files, please wait ..." 0 0
+	finder=$(cat $LOGDIR/find.log | wc -l)
+	finderdir=$(cat $LOGDIR/find.log)
+	PATHLGS=$(cat $LOGDIR/find.log)
+	if (($finder == 1)); then
+		IFS='/' read -r -a ARRAYLGS <<<"$finderdir"
+		IND1=$(echo ${#ARRAYLGS[@]})
+		let IND2=($IND1 - 2)
+		IND=1
+		lgs="/"
+		while (($IND <= $IND2)); do
+			dir="$lgs${ARRAYLGS[$IND]}/"
+			lgs=$dir
+			let IND=($IND + 1)
+		done
+		select-dir-file_lgs2
+	else
+		dialog --backtitle "MIXMASTER MANAGER" --ok-label Next --msgbox "LGS not found, please show us the directory" 0 0
+		select-dir2
+	fi
+}
+function select-dir() {
+	dir=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "PATH of server files: " \
+		--fselect / \
+		10 70)
+	case $? in
+	1 | 255) select_lang ;;
+	esac
+	echo "$date PATH FULL: $dir" >>$CONFIGLOG
+	select-dir-path_lgs
+}
+function select-dir2() {
+	dir=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "PATH of server files: " \
+		--fselect / \
+		10 70)
+	case $? in
+	1 | 255) select_lang ;;
+	esac
+	echo "$date PATH FULL: $dir" >>$CONFIGLOG
+	select-dir-path_lgs2
+}
+function select-dir-path_lgs() {
+	findlgs_line=$(find $dir -maxdepth 1 -type d -name "lgs*" | wc -l)
+	if (($findlgs_line == 1)); then
+		PATHLGS=$(find $dir -maxdepth 1 -type d -name "lgs*")
+		echo "$date LGS PATH: $PATHLGS" >>$CONFIGLOG
+		select-dir-file_lgs
+	elif (($findlgs_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one directory LGS found" 0 0
+		case $? in
+		1 | 255) select-dir ;;
+		esac
+		DIR1=$(find $dir -maxdepth 1 -type d -name "lgs*" | sed -n -e 1p)
+		DIR2=$(find $dir -maxdepth 1 -type d -name "lgs*" | sed -n -e 2p)
+		dirfind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the directory to use" \
+			0 0 0 \
+			1 "$DIR1" \
+			2 "$DIR2")
+		case $dirfind in
+		1) PATHLGS=$DIR1 ;;
+		2) PATHLGS=$DIR2 ;;
+		*) select-dir ;;
+		esac
+		echo "$date LGS PATH: $PATHLGS" >>$CONFIGLOG
+		select-dir-file_lgs
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "Directory LGS not found! Choose the correct directory" 0 0
+		echo "$date $PATHLGS not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir ;;
+		esac
+	fi
+}
+function select-dir-file_lgs() {
+	findlgs_file=$(find $PATHLGS -maxdepth 1 -type f -name "1*" | wc -l)
+	if (($findlgs_file == 1)); then
+		LGSFILE=$(find $PATHLGS -maxdepth 1 -type f -name "1*")
+		echo "$date LGS PATH FILE: $LGSFILE" >>$CONFIGLOG
+		select-dir-path_gms
+	elif (($findlgs_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file LGS found" 0 0
+		case $? in
+		1 | 255) select-dir ;;
+		esac
+		ARQ1=$(find $PATHLGS -maxdepth 1 -type f -name "1*" | sed -n -e 1p)
+		ARQ2=$(find $PATHLGS -maxdepth 1 -type f -name "1*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) LGSFILE=$ARQ1 ;;
+		2) LGSFILE=$ARQ2 ;;
+		*) select-dir ;;
+		esac
+		echo "$date LGS PATH FILE: $LGSFILE" >>$CONFIGLOG
+		select-dir-path_gms
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "LGS not found! Choose the correct directory" 0 0
+		echo "$date $LGSFILE not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir ;;
+		esac
+	fi
+
+}
+function select-dir-file_lgs2() {
+	findlgs_file=$(find $PATHLGS -maxdepth 1 -type f -name "1*" | wc -l)
+	if (($findlgs_file == 1)); then
+		LGSFILE=$(find $PATHLGS -maxdepth 1 -type f -name "1*")
+		echo "$date LGS PATH FILE: $LGSFILE" >>$CONFIGLOG
+		select-dir-path_gms1_2
+	elif (($findlgs_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file LGS found" 0 0
+		case $? in
+		1 | 255) select-dir2 ;;
+		esac
+		ARQ1=$(find $PATHLGS -maxdepth 1 -type f -name "1*" | sed -n -e 1p)
+		ARQ2=$(find $PATHLGS -maxdepth 1 -type f -name "1*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) LGSFILE=$ARQ1 ;;
+		2) LGSFILE=$ARQ2 ;;
+		*) select-dir2 ;;
+		esac
+		echo "$date LGS PATH FILE: $LGSFILE" >>$CONFIGLOG
+		select-dir-path_gms2_2
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "LGS not found! Choose the correct directory" 0 0
+		echo "$date $LGSFILE not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir2 ;;
+		esac
+	fi
+
+}
+function select-dir-path_gms() {
+	echo "select-dir-path_gms - dir: $dir" >>$CONFIGLOG
+	findgms_line=$(find $dir -maxdepth 1 -type d -name "gms*" | wc -l)
+	echo "findgms_line: $findgms_line" >>$CONFIGLOG
+	if (($findgms_line == 1)); then
+		PATHGMS=$(find $dir -maxdepth 1 -type d -name "gms*")
+		echo "$date GMS PATH: $PATHGMS" >>$CONFIGLOG
+		select-dir-file_gms
+	elif (($findgms_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one directory GMS found" 0 0
+		case $? in
+		1 | 255) select-dir ;;
+		esac
+		DIR1=$(find $dir -maxdepth 1 -type d -name "gms*" | sed -n -e 1p)
+		DIR2=$(find $dir -maxdepth 1 -type d -name "gms*" | sed -n -e 2p)
+		dirfind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the directory to use" \
+			0 0 0 \
+			1 "$DIR1" \
+			2 "$DIR2")
+		case $dirfind in
+		1) PATHGMS=$DIR1 ;;
+		2) PATHGMS=$DIR2 ;;
+		*) select-dir ;;
+		esac
+		echo "$date GMS PATH: $PATHGMS" >>$CONFIGLOG
+		select-dir-file_gms
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "Directory GMS not found! Choose the correct directory" 0 0
+		echo "$date $PATHGMS not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir ;;
+		esac
+	fi
+}
+function select-dir-path_gms1_2() {
+	PATHGMS1=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "Directory GMS (Servidor 1)" \
+		--fselect / \
+		10 70)
+	case $? in
+	1 | 255) select_lang ;;
+	esac
+	echo "$date PATH GMS1: $PATHGMS1" >>$CONFIGLOG
+	select-dir-file_gms1_2
+}
+function select-dir-path_gms2_2() {
+	PATHGMS2=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "Directory GMS (Servidor 2)" \
+		--fselect / \
+		10 70)
+	case $? in
+	1 | 255) select_lang ;;
+	esac
+	echo "$date PATH GMS2: $PATHGMS2" >>$CONFIGLOG
+	select-dir-file_gms2_2
+}
+function select-dir-file_gms() {
+	findgms_file=$(find $PATHGMS -maxdepth 1 -type f -name "2*" | wc -l)
+	if (($findgms_file == 1)); then
+		GMSFILE=$(find $PATHGMS -maxdepth 1 -type f -name "2*")
+		echo "$date GMS PATH FILE: $GMSFILE" >>$CONFIGLOG
+		select-dir-path_zs
+	elif (($findgms_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file GMS found" 0 0
+		case $? in
+		1 | 255) select-dir ;;
+		esac
+		ARQ1=$(find $PATHGMS -maxdepth 1 -type f -name "2*" | sed -n -e 1p)
+		ARQ2=$(find $PATHGMS -maxdepth 1 -type f -name "2*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) GMSFILE=$ARQ1 ;;
+		2) GMSFILE=$ARQ2 ;;
+		*) select-dir ;;
+		esac
+		echo "$date GMS PATH FILE: $GMSFILE" >>$CONFIGLOG
+		select-dir-path_zs
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "GMS not found! Choose the correct directory" 0 0
+		echo "$date $GMSFILE not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir ;;
+		esac
+	fi
+}
+function select-dir-file_gms1_2() {
+	findgms1_file=$(find $PATHGMS1 -maxdepth 1 -type f -name "2*" | wc -l)
+	if (($findgms1_file == 1)); then
+		GMSFILE1=$(find $PATHGMS1 -maxdepth 1 -type f -name "2*")
+		echo "$date GMS PATH FILE: $GMSFILE1" >>$CONFIGLOG
+		select-dir-path_gms2_2
+	elif (($findgms1_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file GMS found" 0 0
+		case $? in
+		1 | 255) select-dir-path_gms1_2 ;;
+		esac
+		ARQ1=$(find $PATHGMS1 -maxdepth 1 -type f -name "2*" | sed -n -e 1p)
+		ARQ2=$(find $PATHGMS1 -maxdepth 1 -type f -name "2*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) GMSFILE1=$ARQ1 ;;
+		2) GMSFILE1=$ARQ2 ;;
+		*) select-dir-path_gms1_2 ;;
+		esac
+		echo "$date GMS1 PATH FILE: $GMSFILE1" >>$CONFIGLOG
+		select-dir-path_gms2_2
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "GMS not found! Choose the correct directory" 0 0
+		echo "$date $GMSFILE1 not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir-path_gms1_2 ;;
+		esac
+	fi
+}
+function select-dir-file_gms2_2() {
+	findgms2_file=$(find $PATHGMS2 -maxdepth 1 -type f -name "2*" | wc -l)
+	if (($findgms2_file == 1)); then
+		GMSFILE2=$(find $PATHGMS2 -maxdepth 1 -type f -name "2*")
+		echo "$date GMS2 PATH FILE: $GMSFILE2" >>$CONFIGLOG
+		select-dir-path_zs1_2
+	elif (($findgms2_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file GMS found" 0 0
+		case $? in
+		1 | 255) select-dir-path_gms2_2 ;;
+		esac
+		ARQ1=$(find $PATHGMS2 -maxdepth 1 -type f -name "2*" | sed -n -e 1p)
+		ARQ2=$(find $PATHGMS2 -maxdepth 1 -type f -name "2*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) GMSFILE2=$ARQ1 ;;
+		2) GMSFILE2=$ARQ2 ;;
+		*) select-dir-path_gms2_2 ;;
+		esac
+		echo "$date GMS2 PATH FILE: $GMSFILE2" >>$CONFIGLOG
+		select-dir-path_zs1_2
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "GMS not found! Choose the correct directory" 0 0
+		echo "$date $GMSFILE2 not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir-path_gms2_2 ;;
+		esac
+	fi
+}
+
+function select-dir-path_zs() {
+	findzs_line=$(find $dir -maxdepth 1 -type d -name "zs*" | wc -l)
+	if (($findzs_line == 1)); then
+		PATHZS=$(find $dir -maxdepth 1 -type d -name "zs*")
+		echo "$date ZS PATH: $PATHZS" >>$CONFIGLOG
+		select-dir-file_zs
+	elif (($findzs_line > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one directory ZS found" 0 0
+		case $? in
+		1 | 255) select-dir ;;
+		esac
+		DIR1=$(find $dir -maxdepth 1 -type d -name "zs*" | sed -n -e 1p)
+		DIR2=$(find $dir -maxdepth 1 -type d -name "zs*" | sed -n -e 2p)
+		dirfind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the directory to use" \
+			0 0 0 \
+			1 "$DIR1" \
+			2 "$DIR2")
+		case $dirfind in
+		1) PATHZS=$DIR1 ;;
+		2) PATHZS=$DIR2 ;;
+		*) select-dir ;;
+		esac
+		echo "$date ZS PATH: $PATHZS" >>$CONFIGLOG
+		select-dir-file_zs
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "Directory ZS not found! Choose the correct directory" 0 0
+		echo "$date Directory $PATHZS not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir ;;
+		esac
+	fi
+}
+function select-dir-path_zs1_2() {
+	PATHZS1=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "Directory ZS (Servidor 1)" \
+		--fselect / \
+		10 70)
+	case $? in
+	1 | 255) select-dir-path_gms1_2 ;;
+	esac
+	echo "$date PATH ZS1: $PATHZS1" >>$CONFIGLOG
+	select-dir-file_zs1_2
+}
+function select-dir-path_zs2_2() {
+	PATHZS2=$(dialog \
+		--stdout \
+		--backtitle "MIXMASTER MANAGER INSTALL" \
+		--ok-label Next \
+		--cancel-label Back \
+		--title "Directory ZS (Servidor 1)" \
+		--fselect / \
+		10 70)
+	case $? in
+	1 | 255) select-dir-path_zs1_2 ;;
+	esac
+	echo "$date PATH ZS2: $PATHZS2" >>$CONFIGLOG
+	select-dir-file_zs2_2
+}
+function select-dir-file_zs() {
+	echo "$date ZS PATH IN ZS FILE: $PATHZS" >>$CONFIGLOG
+	findzs_file=$(find $PATHZS -maxdepth 1 -type f -name "3*" | wc -l)
+	if (($findzs_file == 1)); then
+		ZSFILE=$(find $PATHZS -maxdepth 1 -type f -name "3*")
+		echo "$date ZS PATH FILE: $ZSFILE" >>$CONFIGLOG
+		select_dir-copy
+	elif (($findzs_file > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file ZS found" 0 0
+		case $? in
+		1 | 255) select-dir ;;
+		esac
+		ARQ1=$(find $PATHZS -maxdepth 1 -type f -name "3*" | sed -n -e 1p)
+		ARQ2=$(find $PATHZS -maxdepth 1 -type f -name "3*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) ZSFILE=$ARQ1 ;;
+		2) ZSFILE=$ARQ2 ;;
+		*) select-dir ;;
+		esac
+		echo "$date ZS PATH FILE: $ZSFILE" >>$CONFIGLOG
+		select_dir-copy
+	else
+		echo "$date Arquivo $ZSFILE not found" >>$CONFIGLOG
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "ZS not found! Choose the correct directory" 0 0
+		case $? in
+		*) select-dir ;;
+		esac
+	fi
+}
+function select-dir-file_zs1_2() {
+	findzs1_file=$(find $PATHZS1 -maxdepth 1 -type f -name "3*" | wc -l)
+	if (($findzs1_file == 1)); then
+		ZSFILE1=$(find $PATHZS1 -maxdepth 1 -type f -name "3*")
+		echo "$date ZS1 PATH FILE: $ZSFILE1" >>$CONFIGLOG
+		select_dir-path_zs2_2
+	elif (($findzs1_file > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file ZS found" 0 0
+		case $? in
+		1 | 255) select-dir-path_zs1_2 ;;
+		esac
+		ARQ1=$(find $PATHZS1 -maxdepth 1 -type f -name "3*" | sed -n -e 1p)
+		ARQ2=$(find $PATHZS1 -maxdepth 1 -type f -name "3*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) ZSFILE1=$ARQ1 ;;
+		2) ZSFILE1=$ARQ2 ;;
+		*) select-dir-path_zs1_2 ;;
+		esac
+		echo "$date ZS PATH FILE: $ZSFILE1" >>$CONFIGLOG
+		select_dir-path_zs2_2
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "ZS not found! Choose the correct directory" 0 0
+		echo "$date $ZSFILE1 not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir-path_zs1_2 ;;
+		esac
+	fi
+}
+function select-dir-file_zs2_2() {
+	findzs2_file=$(find $PATHZS2 -maxdepth 1 -type f -name "3*" | wc -l)
+	if (($findzs2_file == 1)); then
+		ZSFILE2=$(find $PATHZS2 -maxdepth 1 -type f -name "3*")
+		echo "$date ZS2 PATH FILE: $ZSFILE2" >>$CONFIGLOG
+		select_dir-copy2
+	elif (($findzs2_files > 1)); then
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Next --msgbox "More than one file ZS found" 0 0
+		case $? in
+		1 | 255) select-dir-path_zs2_2 ;;
+		esac
+		ARQ1=$(find $PATHZS2 -maxdepth 1 -type f -name "3*" | sed -n -e 1p)
+		ARQ2=$(find $PATHZS2 -maxdepth 1 -type f -name "3*" | sed -n -e 2p)
+		filefind=$(dialog \
+			--stdout \
+			--backtitle "MIXMASTER MANAGER INSTALL" \
+			--ok-label Next \
+			--menu "Choose the file to use" \
+			0 0 0 \
+			1 "$ARQ1" \
+			2 "$ARQ2")
+		case $filefind in
+		1) ZSFILE2=$ARQ1 ;;
+		2) ZSFILE2=$ARQ2 ;;
+		*) select-dir-path_zs2_2 ;;
+		esac
+		echo "$date ZS PATH FILE: $ZSFILE2" >>$CONFIGLOG
+		select_dir-copy2
+	else
+		dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "ZS not found! Choose the correct directory" 0 0
+		echo "$date $ZSFILE2 not found" >>$CONFIGLOG
+		case $? in
+		*) select-dir-path_zs2_2 ;;
+		esac
+	fi
+}
+function select_dir-copy() {
+	cp $PTBR/um-servidor $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHFULL:$dir:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARLGS:$LGSFILE:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARGMS:$GMSFILE:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARZS:$ZSFILE:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHLGS:$PATHLGS:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHGMS:$PATHGMS:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHZS:$PATHZS:g" $PTBR/copy/serverfile_copy
+
+	cp $PTBR/reconfigure $PTBR/copy/reconfigure
+	sed -i "s:MUDARPATHFULL:$dir:g" $PTBR/copy/reconfigure
+	sed -i "s:MUDARLGS:$LGSFILE:g" $PTBR/copy/reconfigure
+	sed -i "s:MUDARGMS:$GMSFILE:g" $PTBR/copy/reconfigure
+	sed -i "s:MUDARZS:$ZSFILE:g" $PTBR/copy/reconfigure
+	sed -i "s:MUDARPATHLGS:$PATHLGS:g" $PTBR/copy/reconfigure
+	sed -i "s:MUDARPATHGMS:$PATHGMS:g" $PTBR/copy/reconfigure
+	sed -i "s:MUDARPATHZS:$PATHZS:g" $PTBR/copy/reconfigure
+	mkdir /var/log/mixmaster/ 2>/dev/null
+	touch /var/log/mixmaster/information.log
+	touch /var/log/mixmaster/error.log
+	mv $PTBR/copy/serverfile_copy /bin/mixmaster
+	mv $PTBR/copy/reconfigure /bin/mixmaster_reconfigure
+	chmod +x /bin/mixmaster*
+	dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "Installation completed" 0 0
+
+}
+function select_dir-copy2() {
+	cp $PTBR/dois-servidores $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHFULL:$dir:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARLGS:$LGSFILE:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARGMS1:$GMSFILE1:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARZS1:$ZSFILE1:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARGMS2:$GMSFILE2:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARZS2:$ZSFILE2:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHLGS:$PATHLGS:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHGMS1:$PATHGMS1:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHZS1:$PATHZS1:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHGMS2:$PATHGMS2:g" $PTBR/copy/serverfile_copy
+	sed -i "s:MUDARPATHZS2:$PATHZS2:g" $PTBR/copy/serverfile_copy
+	mkdir /var/log/mixmaster/
+	touch /var/log/mixmaster/information.log
+	touch /var/log/mixmaster/error.log
+	mv $PTBR/copy/serverfile_copy /bin/mixmaster
+	dialog --backtitle "MIXMASTER MANAGER INSTALL" --ok-label Back --msgbox "nstallation completed" 0 0
+}
+
+select_lang
