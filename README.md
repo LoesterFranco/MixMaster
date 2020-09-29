@@ -15,13 +15,13 @@ TENHA CERTEZA DE SEGUIR TODOS OS PASSOS
 #############################################################
 
 Pacote:
-    -   mixmaster manager: start - stop - restart server
-        Utilização do manager:
-        # mixmaster
-    -   configure: para quem não possui os arquivos do servidor de mixmaster, irá configurar um novo servidor no local desejado (DISPONIVEL SOMENTE PARA OPÇÃO "1 SERVIDOR")
-    -   mixmaster reconfigure: Reconfiguração de servidor já existente, para quem desejar atualizar o acesso ao banco de dados/ip do servidor (DISPONIVEL SOMENTE PARA OPÇÃO "1 SERVIDOR")
-        Utilização do reconfigure: 
-        # mixmaster_reconfigure
+-   mixmaster manager: start - stop - restart server
+    Utilização do manager:
+    # mixmaster
+-   configure: para quem não possui os arquivos do servidor de mixmaster, irá configurar um novo servidor no local desejado (DISPONIVEL SOMENTE PARA OPÇÃO "1 SERVIDOR")
+-   mixmaster reconfigure: Reconfiguração de servidor já existente, para quem desejar atualizar o acesso ao banco de dados/ip do servidor (DISPONIVEL SOMENTE PARA OPÇÃO "1 SERVIDOR")
+    Utilização do reconfigure: 
+    # mixmaster_reconfigure
 
 *Caso não tenha o git instalado no servidor, executar:
     #yum install git
