@@ -25,3 +25,5 @@ Pacote:
 
 *Caso não tenha o git instalado no servidor, executar:
     #yum install git
+    
+SISTEMA OPERACIONAL SUPORTADO: CENTOS 7
